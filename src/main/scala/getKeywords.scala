@@ -9,11 +9,8 @@ object getKeywords {
   def main(args: Array[String]): Unit = {
     var filepath = "/C:/Users/31476/Desktop/543/bytecup2018/processed_train.0.txt"
     val data = readWords(filepath)
-//    TFIDF.tfidf(data)
-
-    val text = data.select("content").collect()
-    for (ele <- text)
-      RAKE.run(ele.toString)
+    TFIDF.tfidf_model(data)
+    LDA.lda_model(data)
 
 
   }

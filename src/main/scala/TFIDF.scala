@@ -12,7 +12,7 @@ object TFIDF {
   case class WordsWithID(id: String, words: Array[String])
   case class ArticleFeatures(id: String, features: Vector)
 
-  def tfidf(inputFrame: DataFrame): Unit ={
+  def tfidf_model(inputFrame: DataFrame): Unit ={
 
 
     val spark = SparkSession
