@@ -1,38 +1,48 @@
-import org.apache.spark.ml.clustering.LDA
-import org.apache.spark.sql.functions._
-import org.apache.spark.ml.feature._
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.ml.Pipeline
-import org.apache.spark.ml.clustering.DistributedLDAModel
+import org.apache.spark.SparkConf
+import org.apache.spark.ml.feature.{CountVectorizer, CountVectorizerModel}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.mllib.clustering.{DistributedLDAModel, EMLDAOptimizer, LDA, OnlineLDAOptimizer}
+import org.apache.spark.mllib.linalg.Vectors
+import org.apache.spark.ml.linalg.{Vector => MLVector}
 
 object LDA {
 
   def lda_model(inputFrame: DataFrame): Unit ={
-    val vectorizer = new CountVectorizer()
+    val cvModel: CountVectorizerModel = new CountVectorizer()
       .setInputCol("words")
-      .setOutputCol("features")
-    val numTopics = 10
-    val lda = new LDA()
-      .setK(numTopics)
-      .setMaxIter(50)
-      .setOptimizer("em")
-    val pipeline = new Pipeline().setStages(Array(vectorizer, lda))
-    val pipelineModel = pipeline.fit(inputFrame)
-    val vectorizerModel = pipelineModel.stages(0).asInstanceOf[CountVectorizerModel]
-    val ldaModel = pipelineModel.stages(1).asInstanceOf[DistributedLDAModel]
-    ldaModel.trainingLogLikelihood
-    val vocabList = vectorizerModel.vocabulary
-    val termsIdx2Str = udf { (termIndices: Seq[Int]) => termIndices.map(idx => vocabList(idx)) }
-    val topics = ldaModel.describeTopics(maxTermsPerTopic = 5)
-      .withColumn("terms", termsIdx2Str(col("termIndices")))
-    val res = topics.select("topic", "terms", "termWeights")
-    val zipUDF = udf { (terms: Seq[String], probabilities: Seq[Double]) => terms.zip(probabilities) }
-    val topicsTmp = topics.withColumn("termWithProb", explode(zipUDF(col("terms"), col("termWeights"))))
-    val termDF = topicsTmp.select(
-      col("topic").as("topicId"),
-      col("termWithProb._1").as("term"),
-      col("termWithProb._2").as("probability"))
+      .setOutputCol("rawFeatures")
+      .setMinDF(4)
+      .fit(inputFrame)
 
+    val documents = cvModel.transform(inputFrame).select("rawFeatures").rdd.map {
+      case Row(features: MLVector) => Vectors.fromML(features)
+    }.zipWithIndex().map(_.swap)
+    val vocab = cvModel.vocabulary
+    val count = documents.map(_._2.numActives).sum().toLong
+    val actualCorpusSize = documents.count()
+    val actualVocabSize = vocab.length
+    val lda = new LDA()
+    lda.setK(1000)
+      .setMaxIterations(10)
+    val ldaModel = lda.run(documents)
+    if (ldaModel.isInstanceOf[DistributedLDAModel]) {
+      val distLDAModel = ldaModel.asInstanceOf[DistributedLDAModel]
+      val avgLogLikelihood = distLDAModel.logLikelihood / actualCorpusSize.toDouble
+      println(s"\t Training data average log likelihood: $avgLogLikelihood")
+      println()
+    }
+    val topicIndices = ldaModel.describeTopics(maxTermsPerTopic = 20)
+    val topics = topicIndices.map { case (terms, termWeights) =>
+      terms.zip(termWeights).map { case (term, weight) => (vocab(term.toInt), weight) }
+    }
+    println(s"${5} topics:")
+    topics.zipWithIndex.foreach { case (topic, i) =>
+      println(s"TOPIC $i")
+      topic.foreach { case (term, weight) =>
+        println(s"$term\t$weight")
+      }
+      println()
+    }
   }
 
 

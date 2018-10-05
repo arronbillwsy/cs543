@@ -4,7 +4,7 @@
 		module="project_2.11"
 		revision="0.1"
 		status="integration"
-		publication="20181003110158"
+		publication="20181005133948"
 	>
 		<description>
 		project
@@ -35,5 +35,6 @@
 		<dependency org="org.apache.spark" name="spark-core_2.11" rev="2.3.0" conf="compile->default(compile)"/>
 		<dependency org="org.apache.spark" name="spark-mllib_2.11" rev="2.3.2" conf="compile->default(compile)"/>
 		<dependency org="org.apache.spark" name="spark-sql_2.11" rev="2.3.2" conf="compile->default(compile)"/>
+		<dependency org="edu.stanford.nlp" name="stanford-corenlp" rev="3.9.1" conf="compile->default(compile)"/>
 	</dependencies>
 </ivy-module>

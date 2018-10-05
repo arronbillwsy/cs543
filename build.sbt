@@ -14,7 +14,7 @@ libraryDependencies += "org.apache.spark" %% "spark-sql" % "2.3.2"
 
 //libraryDependencies += "edu.stanford.nlp" % "stanford-parser" % "3.6.0"
 
-//libraryDependencies += "edu.stanford.nlp" % "stanford-corenlp" % "3.9.1"
+libraryDependencies += "edu.stanford.nlp" % "stanford-corenlp" % "3.9.1"
 
 
 
