@@ -22,6 +22,7 @@ object getKeywords {
     val stringFrame = spark.read.text(path).as[String]
     val jsonFrame = spark.read.json(stringFrame)
     val data = jsonFrame.select("id","words", "title","content").filter("content != ''")
+    spark.close()
     data
   }
 

@@ -1,5 +1,5 @@
-import org.apache.spark.SparkConf
-import org.apache.spark.ml.feature.{CountVectorizer, CountVectorizerModel}
+import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.ml.feature.{CountVectorizer, CountVectorizerModel, StopWordsRemover}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.mllib.clustering.{DistributedLDAModel, EMLDAOptimizer, LDA, OnlineLDAOptimizer}
 import org.apache.spark.mllib.linalg.Vectors
@@ -7,14 +7,25 @@ import org.apache.spark.ml.linalg.{Vector => MLVector}
 
 object LDA {
 
+  var stopwordFile = "src/main/resources/stopWords.txt"
+
   def lda_model(inputFrame: DataFrame): Unit ={
+    val conf = new SparkConf().setAppName("wordcount").setMaster("local");
+    val sc = new SparkContext(conf)
+    val stopWordText = sc.textFile(stopwordFile).collect()
+    stopWordText.flatMap(_.stripMargin.split(","))
+    val stopWordsRemover = new StopWordsRemover().setInputCol("words").setOutputCol("wordsWithoutStopwords")
+    stopWordsRemover.setStopWords(stopWordsRemover.getStopWords)
+    val filteredFrame = stopWordsRemover.transform(inputFrame)
+
+
     val cvModel: CountVectorizerModel = new CountVectorizer()
-      .setInputCol("words")
+      .setInputCol("wordsWithoutStopwords")
       .setOutputCol("rawFeatures")
       .setMinDF(4)
-      .fit(inputFrame)
+      .fit(filteredFrame)
 
-    val documents = cvModel.transform(inputFrame).select("rawFeatures").rdd.map {
+    val documents = cvModel.transform(filteredFrame).select("rawFeatures").rdd.map {
       case Row(features: MLVector) => Vectors.fromML(features)
     }.zipWithIndex().map(_.swap)
     val vocab = cvModel.vocabulary

@@ -5,7 +5,7 @@ object RAKE {
   private val sentenceDelimiter = """[\\[\\]\n.!?,;:\t\\-\\"\\(\\)\\\'\u2019\u2013]""".r
   private val maxWordsInPhrase: Int = 5
   private val minCharLength: Int = 1
-  private val stopWords = Source.fromInputStream(getClass.getResourceAsStream("/SmartStoplist.txt")).getLines().drop(1).toSet
+  private val stopWords = Source.fromInputStream(getClass.getResourceAsStream("/stopWords.txt")).getLines().drop(1).toSet
 
   private def splitTextToSentences(text: String): List[String] = {
     sentenceDelimiter.split(text).toList
