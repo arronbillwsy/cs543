@@ -3,6 +3,7 @@ import org.apache.spark.ml.feature.{CountVectorizer, CountVectorizerModel, Hashi
 import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector}
 import org.apache.spark.sql.{DataFrame, Dataset, Encoders, SparkSession}
 import breeze.linalg.{DenseVector => BDV, SparseVector => BSV, Vector => BV}
+import org.apache.spark.{SparkConf, SparkContext}
 
 object getKeywords {
 
@@ -10,7 +11,8 @@ object getKeywords {
     var filepath = "/C:/Users/31476/Desktop/543/bytecup2018/processed_train.0.txt"
     val data = readWords(filepath)
 //    TFIDF.tfidf_model(data)
-    LDA.lda_model(data)
+//    LDA.lda_model(data)
+    RAKE.rake(data)
 
 
   }
@@ -18,11 +20,11 @@ object getKeywords {
   def readWords(path : String) ={
     val spark = SparkSession.builder().master("local").appName("readWords")
       .config("spark.some.config.option", "some-value").getOrCreate()
+
     import spark.implicits._
     val stringFrame = spark.read.text(path).as[String]
     val jsonFrame = spark.read.json(stringFrame)
     val data = jsonFrame.select("id","words", "title","content").filter("content != ''")
-    spark.close()
     data
   }
 

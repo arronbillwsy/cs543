@@ -1,16 +1,16 @@
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.ml.feature.{CountVectorizer, CountVectorizerModel, StopWordsRemover}
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
-import org.apache.spark.mllib.clustering.{DistributedLDAModel, EMLDAOptimizer, LDA, OnlineLDAOptimizer}
+import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.mllib.clustering.{DistributedLDAModel, LDA}
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.ml.linalg.{Vector => MLVector}
 
 object LDA {
 
-  var stopwordFile = "src/main/resources/stopWords.txt"
 
   def lda_model(inputFrame: DataFrame): Unit ={
-    val conf = new SparkConf().setAppName("wordcount").setMaster("local");
+    var stopwordFile = "src/main/resources/stopWords.txt"
+    val conf = new SparkConf().setAppName("LDA").setMaster("local");
     val sc = new SparkContext(conf)
     val stopWordText = sc.textFile(stopwordFile).collect()
     stopWordText.flatMap(_.stripMargin.split(","))
@@ -54,6 +54,8 @@ object LDA {
       }
       println()
     }
+
+    sc.stop()
   }
 
 

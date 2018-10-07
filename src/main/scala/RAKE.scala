@@ -1,74 +1,49 @@
-import scala.io.Source
-
+import org.apache.spark.sql.{DataFrame, SparkSession}
 
 object RAKE {
-  private val sentenceDelimiter = """[\\[\\]\n.!?,;:\t\\-\\"\\(\\)\\\'\u2019\u2013]""".r
-  private val maxWordsInPhrase: Int = 5
-  private val minCharLength: Int = 1
-  private val stopWords = Source.fromInputStream(getClass.getResourceAsStream("/stopWords.txt")).getLines().drop(1).toSet
 
-  private def splitTextToSentences(text: String): List[String] = {
-    sentenceDelimiter.split(text).toList
-  }
+  def rake(inputFrame: DataFrame): Unit ={
+    var stopwordFile = "src/main/resources/stopWords.txt"
 
-  private def getPhrasesForSentence(listOfWords: List[String])(predicate: String => Boolean): List[List[String]] = {
-    listOfWords match {
-      case Nil => Nil
-      case x :: xs =>
-        val phrase = listOfWords takeWhile predicate
-        if(phrase.isEmpty || phrase.length > maxWordsInPhrase){
-          getPhrasesForSentence(listOfWords.drop(1))(predicate)
-        }
-        else{
-          phrase :: getPhrasesForSentence(listOfWords.drop(phrase.length + 1))(predicate)
-        }
+    val spark = SparkSession
+      .builder().master("local")
+      .appName("RAKE")
+      .config("spark.some.config.option", "some-value")
+      .getOrCreate()
+    val sc = spark.sparkContext
+    val stopWordText = sc.textFile(stopwordFile).collect()
+    stopWordText.flatMap(_.stripMargin.split(","))
+    val stopsRegex: String = stopWordText.map(w => s"\\b$w(?![\\w-])").mkString("|")
+    val delimiters = "[.!?,;:\t\\\\\"\\(\\)\\\'\u2019\u2013]|\\s\\-\\s"
+    val raw = inputFrame.select("content").rdd.collect()
+    for(i <- 0 until raw.length){
+      val text = raw(i).toString()
+      val scores = RAKE.run(text,delimiters,stopsRegex).toSeq.sortWith(_._2 > _._2)
     }
+
+  }
+  def run(text: String, delimiters: String, stopsRegex: String): Map[String, Double] = {
+    val phraseList = text
+      .split(delimiters)
+      .flatMap(s => s.toLowerCase.split(stopsRegex).map(_.trim))
+      .filterNot(w => w.isEmpty || w == " ")
+    val scores = phraseList
+      .map(separateWords)
+      .flatMap(words => words.map((_, words.length - 1)))
+      .groupBy(_._1)
+      .map {
+        case (word, l) =>
+          val score = (l.length + l.map(_._2).sum) / (l.length * 1D)
+          word -> score
+      }
+    phraseList
+      .map(phrase => phrase -> separateWords(phrase).map(scores(_)).sum)
+      .toMap
   }
 
-  private def isAcceptableString(word: String): Boolean = {
-    if(word.length < minCharLength) return false
-    if(!isAplha(word)) return false
-    if(stopWords.contains(word)) return false
-    return true
+  private def separateWords(phrase: String): Array[String] = {
+    phrase.split("[^a-zA-Z0-9_\\+\\-/]")
+      .filter(w => w.nonEmpty && !w.matches("^\\d+$"))
+    //      .map(_.toLowerCase.trim)
   }
-
-  private def isAplha(word: String): Boolean = {
-    word.matches("[a-z]+")
-  }
-
-
-  private def generateCandidateKeywords(sentences: List[String]): List[List[String]] = {
-    val splittedSentences: List[List[String]] = sentences.map(sentence => sentence.trim.split("\\s+").map(_.toLowerCase).toList)
-    splittedSentences.flatMap(sentenceList => getPhrasesForSentence(sentenceList)(isAcceptableString))
-  }
-
-  private def calculateWordScores(listOfPhrases: List[List[String]]): Map[String, Double] = {
-    val completeListOfWords = listOfPhrases.flatten
-    val wordFreqList: List[(String, Int)] = completeListOfWords.map(word => (word, 1))
-    val wordDegreeListPartial: List[(String, Int)] = listOfPhrases.flatMap{ phrase =>
-      val degree = phrase.length - 1
-      phrase.map(word => (word, degree))
-    }
-    val wordFreqMap: Map[String, Int] = wordFreqList.groupBy(k => k._1).mapValues(l => l.map(_._2).sum)
-    val wordDegreeMap: Map[String, Int] = (wordFreqList ++ wordDegreeListPartial).groupBy(k => k._1).mapValues(l => l.map(_._2).sum)
-    wordFreqMap.keys.map(word => word -> wordDegreeMap(word).toDouble / wordFreqMap(word)).toMap
-  }
-
-  private def calculateScoresForPhrase(listOfPhrases: List[List[String]], wordScores: Map[String, Double]) = {
-    listOfPhrases.map(phrase => phrase.mkString(" ") -> phrase.map(wordScores(_)).sum).toMap
-  }
-
-  def run(text: String): List[(String, Double)] = {
-    val listOfSentences = splitTextToSentences(text)
-    val listOfPhrases = generateCandidateKeywords(listOfSentences)
-    println(listOfPhrases)
-    val wordScores = calculateWordScores(listOfPhrases)
-    println(wordScores)
-    val phraseScores = calculateScoresForPhrase(listOfPhrases, wordScores)
-    println(phraseScores)
-    val orderedPhrases = phraseScores.toList.sortBy(x => x._2).reverse
-    println(orderedPhrases)
-    orderedPhrases
-  }
-
 }
