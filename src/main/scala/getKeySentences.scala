@@ -20,7 +20,13 @@ object getKeySentences {
         var text = raw(i).toString()
         text = text.substring(1,text.length()-1)
         val key_sentences = textRank(text)
-        data.col("content")[i] = key_sentences
+        var sen_text = key_sentences(0)
+        var m = 1
+        while (m < key_sentences.length) {
+          sen_text = sen_text+"."+key_sentences(i)
+          i += 1
+        }
+        val newdf = data.withColumn("content",when(col("content")===text, sen_text).otherwise(col("content")))
         print(1)
       }
     }
