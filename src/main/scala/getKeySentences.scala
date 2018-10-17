@@ -27,6 +27,7 @@ object getKeySentences {
           i += 1
         }
         val newdf = data.withColumn("content",when(col("content")===text, sen_text).otherwise(col("content")))
+        data = newdf
         print(1)
       }
     }
