@@ -9,14 +9,17 @@ object getKeySentences {
   val conf = new SparkConf().setAppName("wordcount").setMaster("local");
   val sc = new SparkContext(conf)
 
+
   def main(args: Array[String]): Unit = {
 
     val i = 0;
     for( i <- 1 to 8) {
-      val wordFile = s"file:///C:/Users/31476/Desktop/543/bytecup2018/bytecup.corpus.train.${i}.txt"
+//      val wordFile = s"file:///C:/Users/31476/Desktop/543/bytecup2018/bytecup.corpus.train.${i}.txt"
+      val wordFile = s"file:////home/wsy/桌面/bytecup2018/preprocess_data/process_train.${i}.txt"
       val data = readContent(wordFile)
-      val raw = data.select("content").rdd.collect()
-      for(i <- 0 until raw.length){
+//      val raw = data.select("content").rdd.collect()
+      for(i <- 0 until data.count()){
+        val row = data.iloc[i]
         var text = raw(i).toString()
         text = text.substring(1,text.length()-1)
         val key_sentences = textRank(text)
@@ -33,8 +36,6 @@ object getKeySentences {
     }
   }
 
-
-
   def readContent(path : String) ={
     val spark = SparkSession.builder().master("local").appName("readWords")
       .config("spark.some.config.option", "some-value").getOrCreate()
@@ -45,11 +46,9 @@ object getKeySentences {
     data
   }
 
-  def textRank(content: String): Array[String] ={
+  def textRank(sentences: String): Array[String] ={
     val threshhold = 0
     val top_k = 10
-    val separator = Array('.','!','?',';','-')
-    val sentences = content.split(separator).distinct
     val i=0
     var vertices: Array[(Long,String)]=Array()
     var edges: Array[Edge[Double]] = Array()
